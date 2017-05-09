@@ -37,18 +37,18 @@ shinyServer(function(input, output) {
       temp_data <- read.table(input$sRIN_data$datapath[x], header = TRUE, skip = input$row_skip)
       sub_temp_data <- subset(temp_data, select = subsets)
       name <- paste("input$",unlist(strsplit(input$sRIN_data$name[x], "\\."))[1], sep="")
-      name2 <- eval(parse(text = name))
+      name2 <- as.numeric(eval(parse(text = "name")))
       #name <- input$sRIN_data$name
-      #test <- "sub_temp_data$F532.Mean*name"
+      test <- as.numeric(sub_temp_data$F532.Mean)*as.numeric(name2)
       #sub_temp_data$F532.Mean <- eval(parse(text = test))
       #sub_temp_data$F532.Mean <- sub_temp_data$F532.Mean*input$eval(input$sRIN_data$name[x])
        # paste("input$",unlist(strsplit(input$sRIN_data$name[x], "\\.")[1]), sep="")
       #lapply(1:length(temp_data[,1]), function(y){
       #dat <- cbind(dat, sub_temp_data)
       if (is.null(dat)){
-        dat <<- as.data.frame(name2)
+        dat <<- as.data.frame(test)
       } else {
-        dat <<- cbind(dat, name2)
+        dat <<- cbind(dat, test)
       }
       #})
     })
