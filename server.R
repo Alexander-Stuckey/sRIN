@@ -11,7 +11,8 @@ library(ggplot2)
 library(DT)
 
 shinyServer(function(input, output) {
-
+  
+  #Create the input boxes for the probe correction factors once some data has been uploaded. Makes one box for each dataset.
   output$probe_correction_factors <- renderUI({
     num_probes <- as.numeric(length(input$sRIN_data$name))
     if (num_probes == 0) {
@@ -25,34 +26,66 @@ shinyServer(function(input, output) {
     )
   })
   
+  #Set the background level of flourescence.
+  output$bg_level <- renderUI({
+    if(is.null(st_rin_data)){
+      return(NULL)
+    }
+    numericInput(inputId = "bg_level", label = "Set the background flourescence level", value = 1205)
+  })
+  bg_level_cutoff <- reactive({
+    2*input$bg_level
+  })
+  
   st_rin_data <- reactive({
-    
-    dat <- NULL
     num_datasets <- as.numeric(length(input$sRIN_data$name))
     if (num_datasets == 0) {
       return(NULL)
     }
-    lapply(1:num_datasets, function(x){
+    x_pos <- read.table(input$sRIN_data$datapath[1], header = TRUE, skip = input$row_skip)
+    y_pos <- read.table(input$sRIN_data$datapath[1], header = TRUE, skip = input$row_skip)
+    dat <- data.frame(x_pos$X, y_pos$Y, numeric(length(x_pos$X)))
+    colnames(dat) <- c("X", "Y", "sRIN")
+    dat$X <- dat$X - min(dat$X)
+    dat$Y <- dat$Y - min(dat$Y)
+    
+    vapply(1:num_datasets, FUN.VALUE = double(length = 22500), FUN = function(x){
       subsets <- c("X", "Y", "F532.Mean")
       temp_data <- read.table(input$sRIN_data$datapath[x], header = TRUE, skip = input$row_skip)
       sub_temp_data <- subset(temp_data, select = subsets)
       name <- paste("input$",unlist(strsplit(input$sRIN_data$name[x], "\\."))[1], sep="")
-      name2 <- as.numeric(eval(parse(text = "name")))
-      #name <- input$sRIN_data$name
-      test <- as.numeric(sub_temp_data$F532.Mean)*as.numeric(name2)
-      #sub_temp_data$F532.Mean <- eval(parse(text = test))
-      #sub_temp_data$F532.Mean <- sub_temp_data$F532.Mean*input$eval(input$sRIN_data$name[x])
-       # paste("input$",unlist(strsplit(input$sRIN_data$name[x], "\\.")[1]), sep="")
-      #lapply(1:length(temp_data[,1]), function(y){
-      #dat <- cbind(dat, sub_temp_data)
-      if (is.null(dat)){
-        dat <<- as.data.frame(test)
-      } else {
-        dat <<- cbind(dat, test)
-      }
-      #})
+      name2 <- as.numeric(eval(parse(text = name)))
+      adjusted_fluro <- sub_temp_data$F532.Mean*name2
+      vapply(1:length(adjusted_fluro), FUN.VALUE = double(length = 1), function(y){
+        if (adjusted_fluro[y] > bg_level_cutoff()) {
+          dat$sRIN[y] <<- dat$sRIN[y] + 2.5
+        } else if (adjusted_fluro[y] < input$bg_level) {
+          dat$sRIN[y] <<- dat$sRIN[y] + 0
+        } else {
+          dat$sRIN[y] <<- dat$sRIN[y] + (2.5*((adjusted_fluro[y]-input$bg_level)/input$bg_level))
+        }
+      })
     })
     dat
+  })
+  
+  output$spot_size <- renderUI({
+    if (is.null(st_rin_data)){
+      return(NULL)
+    }
+    textInput(inputId = "spot_size", label = "Input size for spots in the plot", value = 1)
+  })
+  
+  output$plot_whole_array <- renderPlot({
+    colours <- c("black", "cyan", "yellow", "red", "dark red")
+    plot_aes <- aes(st_rin_data()$X, st_rin_data()$Y, colour = st_rin_data()$sRIN)
+    ggplot(st_rin_data(), plot_aes) + geom_point(size = as.numeric(input$spot_size)) + scale_color_gradientn(colours = colours) + labs(color = "sRIN") +
+      ylim(max(st_rin_data()$Y), min(st_rin_data()$Y)) + xlim(min(st_rin_data()$X), max(st_rin_data()$X)) +
+      theme(axis.text = element_blank(), axis.text.x = element_blank(), axis.text.y = element_blank(),
+            axis.title.x = element_blank(), axis.title.y = element_blank(), panel.background=element_blank(),
+            panel.border=element_blank(),panel.grid.major=element_blank(),panel.grid.minor=element_blank(),
+            plot.background=element_blank(),axis.ticks=element_blank()
+      )
   })
   
   output$st_data <- DT::renderDataTable({
