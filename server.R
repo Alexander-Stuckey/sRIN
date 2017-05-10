@@ -48,6 +48,15 @@ shinyServer(function(input, output) {
     colnames(dat) <- c("X", "Y", "sRIN")
     dat$X <- dat$X - min(dat$X)
     dat$Y <- dat$Y - min(dat$Y)
+
+    dat$nX <- switch(input$adjust_xy,
+      No = round(dat$X/30)*30,
+      Yes = round(dat$X/(input$he_xdim/150))*(input$he_xdim/150)
+    )
+    dat$nY <- switch(input$adjust_xy,
+      No = round(dat$Y/30)*30,
+      Yes = round(dat$Y/(input$he_ydim/150))*(input$he_ydim/150)
+    )
     
     vapply(1:num_datasets, FUN.VALUE = double(length = 22500), FUN = function(x){
       subsets <- c("X", "Y", "F532.Mean")
@@ -69,6 +78,17 @@ shinyServer(function(input, output) {
     dat
   })
   
+  #Adjust the x and y positions based on the dimensions of the HE image (the default x and y positions from the fluroescense program is 4500x4500 pixels)
+  output$adjust_xy <- renderUI({
+    radioButtons(inputId = "adjust_xy", label = "Adjust spot dimensions to that of HE image?", choices = c("Yes", "No"), selected = "No")
+  })
+  output$HE_xdim <- renderUI({
+    numericInput(inputId = "he_xdim", label = "Enter the width of the HE image, in pixels", value = 1)
+  })
+  output$HE_ydim <- renderUI({
+    numericInput(inputId = "he_ydim", label = "Enter the height of the HE image, in pixels", value = 1)
+  })
+  
   output$spot_size <- renderUI({
     if (is.null(st_rin_data)){
       return(NULL)
@@ -78,7 +98,7 @@ shinyServer(function(input, output) {
   
   output$plot_whole_array <- renderPlot({
     colours <- c("black", "cyan", "yellow", "red", "dark red")
-    plot_aes <- aes(st_rin_data()$X, st_rin_data()$Y, colour = st_rin_data()$sRIN)
+    plot_aes <- aes(st_rin_data()$nX, st_rin_data()$nY, colour = st_rin_data()$sRIN)
     ggplot(st_rin_data(), plot_aes) + geom_point(size = as.numeric(input$spot_size)) + scale_color_gradientn(colours = colours) + labs(color = "sRIN") +
       ylim(max(st_rin_data()$Y), min(st_rin_data()$Y)) + xlim(min(st_rin_data()$X), max(st_rin_data()$X)) +
       theme(axis.text = element_blank(), axis.text.x = element_blank(), axis.text.y = element_blank(),
@@ -87,6 +107,17 @@ shinyServer(function(input, output) {
             plot.background=element_blank(),axis.ticks=element_blank()
       )
   })
+  output$plot_name <- renderUI({
+    textInput(inputId = "plot_name", "Please enter a name for your plot and a file extension (e.g. plot.pdf)", value = "plot.pdf")
+  })
+  output$dl_plot <- downloadHandler(
+    filename = function() {
+      input$plot_name
+    },
+    content = function(file) {
+      ggsave(file, device = unlist(strsplit(input$plot_name,"\\."))[2], width = max(4500/72,input$he_xdim/72), height = max(4500/72,input$he_ydim/72), units = "in", limitsize = FALSE)
+    }
+  )
   
   output$st_data <- DT::renderDataTable({
     st_rin_data()

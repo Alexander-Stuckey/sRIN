@@ -15,7 +15,12 @@ header <- dashboardHeader(title = "Spatial RIN")
 sidebar <- dashboardSidebar(
   uiOutput("probe_correction_factors"),
   uiOutput("spot_size"),
-  uiOutput("bg_level")
+  uiOutput("bg_level"),
+  uiOutput("adjust_xy"),
+  uiOutput("HE_xdim"),
+  uiOutput("HE_ydim"),
+  uiOutput("plot_name"),
+  downloadButton("dl_plot", label = "Download the plot")
 )
 
 body <- dashboardBody(
