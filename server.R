@@ -37,6 +37,10 @@ shinyServer(function(input, output) {
     2*input$bg_level
   })
   
+  sRIN_scale <- reactive({
+    10/length(input$sRIN_data$name)
+  })
+  
   st_rin_data <- reactive({
     num_datasets <- as.numeric(length(input$sRIN_data$name))
     if (num_datasets == 0) {
@@ -67,11 +71,11 @@ shinyServer(function(input, output) {
       adjusted_fluro <- sub_temp_data$F532.Mean*name2
       vapply(1:length(adjusted_fluro), FUN.VALUE = double(length = 1), function(y){
         if (adjusted_fluro[y] > bg_level_cutoff()) {
-          dat$sRIN[y] <<- dat$sRIN[y] + 2.5
+          dat$sRIN[y] <<- dat$sRIN[y] + sRIN_scale()
         } else if (adjusted_fluro[y] < input$bg_level) {
           dat$sRIN[y] <<- dat$sRIN[y] + 0
         } else {
-          dat$sRIN[y] <<- dat$sRIN[y] + (2.5*((adjusted_fluro[y]-input$bg_level)/input$bg_level))
+          dat$sRIN[y] <<- dat$sRIN[y] + (sRIN_scale()*((adjusted_fluro[y]-input$bg_level)/input$bg_level))
         }
       })
     })
@@ -110,12 +114,25 @@ shinyServer(function(input, output) {
   output$plot_name <- renderUI({
     textInput(inputId = "plot_name", "Please enter a name for your plot and a file extension (e.g. plot.pdf)", value = "plot.pdf")
   })
+  
+  plot_width <- reactive({
+    switch(input$adjust_xy,
+           No = 4500/72,
+           Yes = input$he_xdim/72
+    )
+  })
+  plot_height <- reactive({
+    switch(input$adjust_xy,
+           No = 4500/72,
+           Yes = input$he_ydim/72
+    )
+  })
   output$dl_plot <- downloadHandler(
     filename = function() {
       input$plot_name
     },
     content = function(file) {
-      ggsave(file, device = unlist(strsplit(input$plot_name,"\\."))[2], width = max(4500/72,input$he_xdim/72), height = max(4500/72,input$he_ydim/72), units = "in", limitsize = FALSE)
+      ggsave(file, device = unlist(strsplit(input$plot_name,"\\."))[2], width = plot_width(), height = plot_height(), units = "in", limitsize = FALSE)
     }
   )
   
