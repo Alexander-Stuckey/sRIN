@@ -22,7 +22,7 @@ shinyServer(function(input, output) {
       return(NULL)
     }
     lapply(1:num_probes, function(x) {
-      textInput(inputId = unlist(strsplit(input$sRIN_data$name[x], "\\.")[1]), 
+      numericInput(inputId = unlist(strsplit(input$sRIN_data$name[x], "\\.")[1]), 
                 label = paste("Correction factor for probe ", unlist(strsplit(input$sRIN_data$name[x], "\\."))[1]), 
                 value = 1)    
     }
@@ -88,7 +88,7 @@ shinyServer(function(input, output) {
     if (is.null(st_rin_data)){
       return(NULL)
     }
-    textInput(inputId = "spot_size", label = "Input size for spots in the plot", value = 1)
+    numericInput(inputId = "spot_size", label = "Input size for spots in the plot", value = 1)
   })
   
   output$plot_whole_array <- renderPlot({

@@ -14,8 +14,8 @@ header <- dashboardHeader(title = "Spatial RIN")
 
 sidebar <- dashboardSidebar(
   uiOutput("probe_correction_factors"),
-  uiOutput("spot_size"),
   uiOutput("bg_level"),
+  uiOutput("spot_size"),
   uiOutput("HE_xdim"),
   uiOutput("HE_ydim"),
   uiOutput("plot_name"),
@@ -45,7 +45,7 @@ body <- dashboardBody(
                  div(style = "overflow-x: scroll", DT::dataTableOutput("st_data"))
                  ),
                fluidPage(
-                 plotOutput("plot_whole_array", height = "1000px")
+                 plotOutput("plot_whole_array", height = 1000)
                )
       )
     )
