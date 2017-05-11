@@ -16,7 +16,6 @@ sidebar <- dashboardSidebar(
   uiOutput("probe_correction_factors"),
   uiOutput("spot_size"),
   uiOutput("bg_level"),
-  uiOutput("adjust_xy"),
   uiOutput("HE_xdim"),
   uiOutput("HE_ydim"),
   uiOutput("plot_name"),
@@ -41,15 +40,14 @@ body <- dashboardBody(
                  column(width = 6, div(style = 'overflow-x: scroll', DT::dataTableOutput("show_data_example")))
                )
       ),
-      tabPanel("Whole Array", width = "auto", 
+      tabPanel("sRIN Heatmap", width = "auto", 
                fluidPage(
                  div(style = "overflow-x: scroll", DT::dataTableOutput("st_data"))
                  ),
                fluidPage(
-                 plotOutput("plot_whole_array")
+                 plotOutput("plot_whole_array", height = "1000px")
                )
-      ),
-      tabPanel("Under Tissue", "content")
+      )
     )
   )
 )
