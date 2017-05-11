@@ -76,6 +76,27 @@ shinyServer(function(input, output) {
     dat
   })
   
+#Sliders to subset the array heatmap
+  output$xlims <- renderUI({
+    sliderInput(inputId = "xlims", label = "Set min and max values to be plotted", min = min(st_rin_data()$X), max = max(st_rin_data()$X),
+                step = 30, value = c(min(st_rin_data()$X), max(st_rin_data()$X))
+    )
+  })
+  output$ylims <- renderUI({
+    sliderInput(inputId = "ylims", label = "Set min and max values to be plotted", min = min(st_rin_data()$Y), max = max(st_rin_data()$Y),
+                step = 30, value = c(min(st_rin_data()$Y), max(st_rin_data()$Y))
+    )
+  })
+  
+#Subset the st_rin_data based on the sliders
+  st_rin_subset <- reactive({
+    xmin <- as.numeric(unlist(strsplit(paste(input$xlims, collapse = " "), split = " "))[1])
+    xmax <- as.numeric(unlist(strsplit(paste(input$xlims, collapse = " "), split = " "))[2])
+    ymin <- as.numeric(unlist(strsplit(paste(input$ylims, collapse = " "), split = " "))[1])
+    ymax <- as.numeric(unlist(strsplit(paste(input$ylims, collapse = " "), split = " "))[2])
+    subset(st_rin_data(), (st_rin_data()$X %in% c(xmin:xmax)) & (st_rin_data()$Y %in% c(ymin:ymax)))
+  })
+  
 #Height and width for the plot when saving
   output$HE_xdim <- renderUI({
     numericInput(inputId = "he_xdim", label = "Enter the width of the image, in pixels", value = 1)
@@ -91,10 +112,14 @@ shinyServer(function(input, output) {
     numericInput(inputId = "spot_size", label = "Input size for spots in the plot", value = 1)
   })
   
+  output$average_sRIN <- renderText({
+    paste("Mean sRIN value in plot: ", mean(st_rin_subset()$sRIN[st_rin_subset()$sRIN > 0]), sep = "")
+  })
+  
   output$plot_whole_array <- renderPlot({
     colours <- c("black", "cyan", "yellow", "red", "dark red")
-    plot_aes <- aes(st_rin_data()$X, st_rin_data()$Y, colour = st_rin_data()$sRIN)
-    ggplot(st_rin_data(), plot_aes) + geom_point(size = as.numeric(input$spot_size)) + scale_color_gradientn(colours = colours) + labs(color = "sRIN") +
+    plot_aes <- aes(st_rin_subset()$X, st_rin_subset()$Y, colour = st_rin_subset()$sRIN)
+    ggplot(st_rin_subset(), plot_aes) + geom_point(size = as.numeric(input$spot_size)) + scale_color_gradientn(colours = colours) + labs(color = "sRIN") +
       ylim(max(st_rin_data()$Y), min(st_rin_data()$Y)) + xlim(min(st_rin_data()$X), max(st_rin_data()$X)) +
       theme(axis.text = element_blank(), axis.text.x = element_blank(), axis.text.y = element_blank(),
             axis.title.x = element_blank(), axis.title.y = element_blank(), panel.background=element_blank(),
