@@ -112,8 +112,18 @@ shinyServer(function(input, output) {
     numericInput(inputId = "spot_size", label = "Input size for spots in the plot", value = 1)
   })
   
+  output$use_zero_in_mean <- renderUI({
+    radioButtons(inputId = "use_zeros", label = "Use points where sRIN == 0 for mean calculation?",
+                 choices = c("No" = "No", "Yes" = "Yes"), selected = "No"
+    )
+  })
+  
   output$average_sRIN <- renderText({
-    paste("Mean sRIN value in plot: ", mean(st_rin_subset()$sRIN[st_rin_subset()$sRIN > 0]), sep = "")
+    sRIN_mean <- switch(input$use_zeros,
+           Yes = mean(st_rin_subset()$sRIN),
+           No = mean(st_rin_subset()$sRIN[st_rin_subset()$sRIN > 0])
+    )
+    paste("Mean sRIN value in plot: ", sRIN_mean, sep = "")
   })
   
   output$plot_whole_array <- renderPlot({

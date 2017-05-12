@@ -18,6 +18,7 @@ sidebar <- dashboardSidebar(
   uiOutput("spot_size"),
   uiOutput("xlims"),
   uiOutput("ylims"),
+  uiOutput("use_zero_in_mean"),
   textOutput("average_sRIN"),
   uiOutput("HE_xdim"),
   uiOutput("HE_ydim"),
