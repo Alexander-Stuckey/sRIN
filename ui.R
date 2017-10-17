@@ -7,21 +7,14 @@
 
 library(shiny)
 library(shinydashboard)
-library(ggplot2)
-library(DT)
+library(raster)
+library(rgdal)
 
 header <- dashboardHeader(title = "Spatial RIN")
 
 sidebar <- dashboardSidebar(
-  uiOutput("probe_correction_factors"),
-  uiOutput("bg_level"),
-  uiOutput("spot_size"),
-  uiOutput("xlims"),
-  uiOutput("ylims"),
-  uiOutput("use_zero_in_mean"),
-  textOutput("average_sRIN"),
-  uiOutput("HE_xdim"),
-  uiOutput("HE_ydim"),
+  #uiOutput("bg_removal"),
+  uiOutput("background"),
   uiOutput("plot_name"),
   downloadButton("dl_plot", label = "Download the plot")
 )
@@ -35,19 +28,22 @@ body <- dashboardBody(
       width = 12,
       tabPanel("Data Input", width = "auto",
                fluidPage(
-                 column(width = 6, fileInput("sRIN_data", "Choose the sRIN data files to upload", multiple = TRUE, 
-                                             accept = c("text/csv", "text/comma-separated-values", "text/plain", "csv"), buttonLabel = "Browse")),
-                 column(width = 6, tableOutput("data_files"))
-               ),
-               fluidPage(
-                 column(width = 6, textInput("row_skip", "Choose how many rows to skip when importing data", value = 26)),
-                 column(width = 6, div(style = 'overflow-x: scroll', DT::dataTableOutput("show_data_example")))
+                 column(width = 6, 
+                        fileInput("sRIN_probe1", "Upload the Probe1 file here", multiple = FALSE,
+                                             accept = "tiff", buttonLabel = "Browse"),
+                        fileInput("sRIN_probe2", "Upload the Probe2 file here", multiple = FALSE, 
+                                             accept = "tiff", buttonLabel = "Browse"),
+                        fileInput("sRIN_probe3", "Upload the Probe3 file here", multiple = FALSE,
+                                  accept = "tiff", buttonLabel = "Browse"),
+                        fileInput("sRIN_probe4", "Upload the Probe4 file here", multiple = FALSE,
+                                  accept = "tiff", buttonLabel = "Browse")
+                        ),
+                 column(width = 6, 
+                        fileInput("no_probes", "Choose background file to upload", multiple = FALSE,
+                                             accept = "tiff", buttonLabel = "Browse"))
                )
       ),
       tabPanel("sRIN Heatmap", width = "auto", 
-               fluidPage(
-                 div(style = "overflow-x: scroll", DT::dataTableOutput("st_data"))
-                 ),
                fluidPage(
                  plotOutput("plot_whole_array", height = 1000)
                )

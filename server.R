@@ -10,165 +10,97 @@
 
 library(shiny)
 library(shinydashboard)
-library(ggplot2)
-library(DT)
+library(raster)
+library(rgdal)
+
+options(shiny.maxRequestSize=30*1024^2)
 
 shinyServer(function(input, output) {
   
-  #Create the input boxes for the probe correction factors once some data has been uploaded. Makes one box for each dataset.
-  output$probe_correction_factors <- renderUI({
-    num_probes <- as.numeric(length(input$sRIN_data$name))
-    if (num_probes == 0) {
-      return(NULL)
-    }
-    lapply(1:num_probes, function(x) {
-      numericInput(inputId = unlist(strsplit(input$sRIN_data$name[x], "\\.")[1]), 
-                label = paste("Correction factor for probe ", unlist(strsplit(input$sRIN_data$name[x], "\\."))[1]), 
-                value = 1)    
-    }
-    )
-  })
-  
-  #Set the background level of flourescence.
-  output$bg_level <- renderUI({
-    if(is.null(st_rin_data)){
-      return(NULL)
-    }
-    numericInput(inputId = "bg_level", label = "Set the background flourescence level", value = 1205)
-  })
-  bg_level_cutoff <- reactive({
-    2*input$bg_level
-  })
-  
   sRIN_scale <- reactive({
-    10/length(input$sRIN_data$name)
+    10/(length(input$sRIN_data$name)+1)
   })
   
-  st_rin_data <- reactive({
-    num_datasets <- as.numeric(length(input$sRIN_data$name))
-    if (num_datasets == 0) {
-      return(NULL)
-    }
-    x_pos <- read.table(input$sRIN_data$datapath[1], header = TRUE, skip = input$row_skip)
-    y_pos <- read.table(input$sRIN_data$datapath[1], header = TRUE, skip = input$row_skip)
-    dat <- data.frame(x_pos$X, y_pos$Y, numeric(length(x_pos$X)))
-    colnames(dat) <- c("X", "Y", "sRIN")
-    dat$X <- dat$X - min(dat$X)
-    dat$Y <- dat$Y - min(dat$Y)
+  #Toggle to set white or black background
+  output$background <- renderUI({
+    radioButtons("background", "What colour background do you want?", choices = c("White", "Black"), selected = "Black")
+  })
+  
+  #Possibly add function to change threshold
+  
+  #Function to convert to sRIN values
+  sRIN_values <- function(raster_layer, threshold, background, probe1_data) {
+    str(raster_layer)
+    str(threshold)
+    str(background)
+    str(probe1_data)
+    tmp_data <- raster(ifelse(is.finite(pmin(pmax(as.matrix(raster_layer-threshold-background),0),threshold)/probe1_data*2.5),
+                         pmin(pmax(as.matrix(raster_layer-threshold-background),0),threshold)/probe1_data*2.5,0))
+    cat(min(values(tmp_data)))
+    cat(max(values(tmp_data)))
+    return(tmp_data)
+  }
+
+  plot_image <- function(){
     
-    vapply(1:num_datasets, FUN.VALUE = double(length = 22500), FUN = function(x){
-      subsets <- c("X", "Y", "F532.Mean")
-      temp_data <- read.table(input$sRIN_data$datapath[x], header = TRUE, skip = input$row_skip)
-      sub_temp_data <- subset(temp_data, select = subsets)
-      name <- paste("input$",unlist(strsplit(input$sRIN_data$name[x], "\\."))[1], sep="")
-      name2 <- as.numeric(eval(parse(text = name)))
-      adjusted_fluro <- sub_temp_data$F532.Mean*name2
-      vapply(1:length(adjusted_fluro), FUN.VALUE = double(length = 1), function(y){
-        if (adjusted_fluro[y] > bg_level_cutoff()) {
-          dat$sRIN[y] <<- dat$sRIN[y] + sRIN_scale()
-        } else if (adjusted_fluro[y] < input$bg_level) {
-          dat$sRIN[y] <<- dat$sRIN[y] + 0
-        } else {
-          dat$sRIN[y] <<- dat$sRIN[y] + (sRIN_scale()*((adjusted_fluro[y]-input$bg_level)/input$bg_level))
-        }
-      })
-    })
-    dat
-  })
-  
-#Sliders to subset the array heatmap
-  output$xlims <- renderUI({
-    sliderInput(inputId = "xlims", label = "Set min and max values to be plotted", min = min(st_rin_data()$X), max = max(st_rin_data()$X),
-                step = 30, value = c(min(st_rin_data()$X), max(st_rin_data()$X))
-    )
-  })
-  output$ylims <- renderUI({
-    sliderInput(inputId = "ylims", label = "Set min and max values to be plotted", min = min(st_rin_data()$Y), max = max(st_rin_data()$Y),
-                step = 30, value = c(min(st_rin_data()$Y), max(st_rin_data()$Y))
-    )
-  })
-  
-#Subset the st_rin_data based on the sliders
-  st_rin_subset <- reactive({
-    xmin <- as.numeric(unlist(strsplit(paste(input$xlims, collapse = " "), split = " "))[1])
-    xmax <- as.numeric(unlist(strsplit(paste(input$xlims, collapse = " "), split = " "))[2])
-    ymin <- as.numeric(unlist(strsplit(paste(input$ylims, collapse = " "), split = " "))[1])
-    ymax <- as.numeric(unlist(strsplit(paste(input$ylims, collapse = " "), split = " "))[2])
-    subset(st_rin_data(), (st_rin_data()$X %in% c(xmin:xmax)) & (st_rin_data()$Y %in% c(ymin:ymax)))
-  })
-  
-#Height and width for the plot when saving
-  output$HE_xdim <- renderUI({
-    numericInput(inputId = "he_xdim", label = "Enter the width of the image, in pixels", value = 1)
-  })
-  output$HE_ydim <- renderUI({
-    numericInput(inputId = "he_ydim", label = "Enter the height of the image, in pixels", value = 1)
-  })
-  
-  output$spot_size <- renderUI({
-    if (is.null(st_rin_data)){
-      return(NULL)
+    if (input$background == "White") {
+      colours <- c("white", "cyan", "yellow", "red", "dark red")
+    } else {
+      colours <- c("black", "cyan", "yellow", "red", "dark red")
     }
-    numericInput(inputId = "spot_size", label = "Input size for spots in the plot", value = 1)
-  })
-  
-  output$use_zero_in_mean <- renderUI({
-    radioButtons(inputId = "use_zeros", label = "Use points where sRIN == 0 for mean calculation?",
-                 choices = c("No" = "No", "Yes" = "Yes"), selected = "No"
-    )
-  })
-  
-  output$average_sRIN <- renderText({
-    sRIN_mean <- switch(input$use_zeros,
-           Yes = mean(st_rin_subset()$sRIN),
-           No = mean(st_rin_subset()$sRIN[st_rin_subset()$sRIN > 0])
-    )
-    paste("Mean sRIN value in plot: ", sRIN_mean, sep = "")
-  })
+    
+    sRIN_background <- raster(input$no_probes$datapath)
+    threshold <- quantile(sRIN_background, probs=0.75)
+    
+    sRIN_probe1 <- raster(input$sRIN_probe1$datapath)
+    sRIN_probe2 <- raster(input$sRIN_probe2$datapath)
+    sRIN_probe3 <- raster(input$sRIN_probe3$datapath)
+    sRIN_probe4 <- raster(input$sRIN_probe4$datapath)
+    
+    probe1_data <- sRIN_values(as.matrix(sRIN_probe1), threshold, as.matrix(sRIN_background), as.matrix(sRIN_probe1))
+    probe2_data <- sRIN_values(as.matrix(sRIN_probe2), threshold, as.matrix(sRIN_background), as.matrix(sRIN_probe1))
+    probe3_data <- sRIN_values(as.matrix(sRIN_probe3), threshold, as.matrix(sRIN_background), as.matrix(sRIN_probe1))
+    probe4_data <- sRIN_values(as.matrix(sRIN_probe4), threshold, as.matrix(sRIN_background), as.matrix(sRIN_probe1))
+    
+   # sRIN_data <- overlay(brick(stack(probe1_data, probe2_data, probe3_data, probe4_data)), fun = function(a,b,c,d) (a+b+c+d))
+    sRIN_data <- brick(stack(probe1_data, probe2_data, probe3_data, probe4_data))
+    #str(sRIN_data)
+    cat(max(values(sRIN_data)))
+    #st_rin_data <-brick(stack(input$sRIN_data$datapath, input$no_probes$datapath))
+    #srin_calc <- letters[seq(from = 1, length.out = length(input$sRIN_data)+1)]
+    #st_rin_data_overlay <- overlay(st_rin_data, fun = function(srin_calc) ((sum(srin_calc[1:length(srin_calc)-1]/4)-(srin_calc[length(srin_calc)]))), unstack = TRUE)
+    
+    #Change the 3 in the following line if you want to adjust how many standard deviations above the meant you want the top end to be.
+    #nbrk <- seq(from = cellStats(st_rin_data, stat = "mean")[length(srin_calc)], to = 65535, length.out = 5)
+    #nbrk <- append(nbrk, cellStats(st_rin_data_overlay, stat = "min"), after = 0)
+   # nbrk <- append(nbrk, cellStats(st_rin_data_overlay, stat = "max"), after = length(nbrk))
+    nbrk <- c(0,2,4,6,8,10)
+    #The legend position is set with the first two values of the legend() method, currently set at (max(x)-65, max(y)/2). Thus, middle of the right hand side.
+    #img_data <- as.matrix(st_rin_data_overlay)
+    #img_data_floor <- pmax(img_data, 0)
+    #image(t(apply(img_data_floor,2,rev)), col = colours, breaks = nbrk)#, xaxt="n", yaxt="n", ann=FALSE)#, xlim=c(0,nrow(st_rin_data_overlay)), ylim=c(0,ncol(st_rin_data_overlay)))#, legend=FALSE)
+    image(sRIN_data, col = colours, breaks = nbrk)
+    #legend(0.2, 1, legend = c("10", "7.5", "5", "2.5", "0"), fill = rev(colours))
+    
+  }
   
   output$plot_whole_array <- renderPlot({
-    colours <- c("black", "cyan", "yellow", "red", "dark red")
-    plot_aes <- aes(st_rin_subset()$X, st_rin_subset()$Y, colour = st_rin_subset()$sRIN)
-    ggplot(st_rin_subset(), plot_aes) + geom_point(size = as.numeric(input$spot_size)) + scale_color_gradientn(colours = colours) + labs(color = "sRIN") +
-      ylim(max(st_rin_data()$Y), min(st_rin_data()$Y)) + xlim(min(st_rin_data()$X), max(st_rin_data()$X)) +
-      theme(axis.text = element_blank(), axis.text.x = element_blank(), axis.text.y = element_blank(),
-            axis.title.x = element_blank(), axis.title.y = element_blank(), panel.background=element_blank(),
-            panel.border=element_blank(),panel.grid.major=element_blank(),panel.grid.minor=element_blank(),
-            plot.background=element_blank(),axis.ticks=element_blank()
-      )
-  })
-  output$plot_name <- renderUI({
-    textInput(inputId = "plot_name", "Please enter a name for your plot and a file extension (e.g. plot.pdf)", value = "plot.pdf")
+    plot_image()
   })
   
-  plot_width <- reactive({
-    input$he_xdim/72
+  output$plot_name <- renderUI({
+    textInput(inputId = "plot_name", "Please enter a name for your plot", value = "sRIN_plot.pdf")
   })
-  plot_height <- reactive({
-    Yes = input$he_ydim/72
-  })
+  
   output$dl_plot <- downloadHandler(
-    filename = function() {
+    filename = function(){
       input$plot_name
     },
     content = function(file) {
-      ggsave(file, device = unlist(strsplit(input$plot_name,"\\."))[2], width = plot_width(), height = plot_height(), units = "in", limitsize = FALSE)
+      pdf(file, width = 10, height = 10)
+      plot_image()
+      dev.off()
     }
   )
   
-  output$st_data <- DT::renderDataTable({
-    st_rin_data()
-  })
-  
-  output$data_files <- renderTable({
-    input$sRIN_data$name
-  })
-  
-  output$show_data_example <- DT::renderDataTable({
-    infile <- input$sRIN_data
-    if (is.null(infile)){
-      return(NULL)
-    }
-    head(read.table(infile$datapath[1], header = TRUE, skip = input$row_skip))
-  })
 })
